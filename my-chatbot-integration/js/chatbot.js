@@ -2,6 +2,9 @@ jQuery(document).ready(function($) {
     const API_URL = myChatbotData.apiUrl;
     const UPLOAD_URL = myChatbotData.uploadUrl;
     const CORS_ORIGIN = myChatbotData.corsOrigin;
+    const USER_ID = myChatbotData.userId;
+    const CAN_UPLOAD = myChatbotData.canUpload;
+    const UPLOAD_NONCE = myChatbotData.uploadNonce;
 
     const chatMessages = $('#chat-messages');
     const userInput = $('#user-input');
@@ -9,6 +12,12 @@ jQuery(document).ready(function($) {
     const pdfUploadInput = $('#pdf-upload');
     const uploadButton = $('#upload-button');
     const uploadStatus = $('#upload-status');
+
+    // Ocultar área de subida si no tiene permiso (por seguridad extra)
+    if (!CAN_UPLOAD) {
+        $('#pdf-upload, #upload-button, #upload-status').hide();
+        $('h2:contains("Subir PDF")').hide();
+    }
 
     function addMessage(sender, message) {
         chatMessages.append(`<p><strong>${sender}:</strong> ${message}</p>`);
@@ -61,6 +70,8 @@ jQuery(document).ready(function($) {
 
         const formData = new FormData();
         formData.append('pdf_file', file);
+        formData.append('user_id', USER_ID);
+        formData.append('wp_nonce', UPLOAD_NONCE);
 
         $.ajax({
             url: UPLOAD_URL,

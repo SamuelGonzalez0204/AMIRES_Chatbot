@@ -41,7 +41,7 @@ INDEX_NAME = "prueba1"
 EMBEDDING_MODEL = "multilingual-e5-large"
 EMBEDDING_DIMENSION = 1024
 
-dynamodb = boto3.resource('dynamodb', region_name=os.environ.get("AWS_DEFAULT_REGION", "us-east-1"))
+dynamodb = boto3.resource('dynamodb', region_name=os.environ.get("AWS_DEFAULT_REGION", "eu-west-3"))
 dynamo_table_name = 'MyopiaMagnaNews'
 dynamo_table = dynamodb.Table(dynamo_table_name)
 
@@ -220,7 +220,7 @@ def process_and_load_data_to_pinecone():
 
 
 app = Flask(__name__)
-CORS(app, origins="*") 
+CORS(app, origins="http://consultas.miopiamagna.org/") 
 
 rag_chain = None
 pinecone_vectorstore = None 
@@ -304,6 +304,25 @@ def ask():
 @app.route('/upload_pdf', methods=['POST'])
 def upload_pdf():
     logger.info("¡Petición recibida en la ruta /upload_pdf de Flask!") 
+    # Validar nonce y user_id
+    user_id = request.form.get('user_id')
+    wp_nonce = request.form.get('wp_nonce')
+    if not user_id or not wp_nonce:
+        logger.warning("Faltan user_id o wp_nonce en la solicitud.")
+        return jsonify({"error": "Faltan credenciales de autenticación."}), 403
+
+    # Validar el nonce consultando a WordPress
+    import requests as pyrequests
+    WP_URL = 'https://consultas.miopiamagna.org/wp-admin/admin-ajax.php'
+    nonce_check = pyrequests.post(WP_URL, data={
+        'action': 'chatbot_validate_nonce',
+        'nonce': wp_nonce,
+        'user_id': user_id
+    })
+    if nonce_check.status_code != 200 or nonce_check.text.strip() != 'valid':
+        logger.warning(f"Nonce inválido para user_id {user_id}.")
+        return jsonify({"error": "No autorizado. Token inválido."}), 403
+
     if 'pdf_file' not in request.files:
         logger.warning("No se encontró 'pdf_file' en la solicitud.")
         return jsonify({"error": "No se proporcionó ningún archivo PDF."}), 400
@@ -351,7 +370,7 @@ def upload_pdf():
                 return jsonify({"error": "El archivo PDF no contiene texto extraíble."}), 400
 
             title = os.path.splitext(pdf_file.filename)[0].replace('_', ' ').replace('-', ' ').title()
-            source = "PDF Cargado"
+            source = f"PDF Cargado por usuario {user_id}"
             url = f"file_upload://{pdf_file.filename}" 
             published_date = datetime.datetime.now().isoformat()
 
@@ -364,7 +383,20 @@ def upload_pdf():
                 document_hash=pdf_hash
             )
 
+            # Guardar el user_id en DynamoDB (añadir campo uploader_id)
             if news_id:
+                try:
+                    dynamo_table.update_item(
+                        Key={
+                            'news_id': news_id,
+                            'published_date': published_date
+                        },
+                        UpdateExpression='SET uploader_id = :uid',
+                        ExpressionAttributeValues={':uid': user_id}
+                    )
+                except Exception as e:
+                    logger.error(f"No se pudo guardar uploader_id en DynamoDB: {e}")
+
                 success = process_single_news_item({
                     'news_id': news_id,
                     'title': title,
