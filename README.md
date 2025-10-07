@@ -54,5 +54,5 @@ El proyecto demuestra sólidas habilidades en MLOps al llevar un modelo de IA a 
 
 - Solución End-to-End: Demuestra la capacidad de liderar un proyecto de IA desde el diseño del modelo hasta el despliegue y la integración en una plataforma web.
 
-Para más información, consulta mi [Perfil de LinkedIn]([https://www.linkedin.com/in/samuel-gonzalezmartin/]). 
+Para más información, consulta mi Perfil de LinkedIn: https://www.linkedin.com/in/samuel-gonzalezmartin/. 
 
